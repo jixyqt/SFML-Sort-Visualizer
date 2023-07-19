@@ -38,4 +38,4 @@ Disclaimer
 The Sorting Algorithm Visualizer is provided as-is, without any warranty or guarantee of its performance or accuracy. The authors and contributors of this project shall not be held liable for any damages or losses arising from the use of this software.
 
 Contact
-For any inquiries or further information, please contact your_email@example.com.
+For any inquiries or further information, please contact bryce.benjamin31@gmail.com
