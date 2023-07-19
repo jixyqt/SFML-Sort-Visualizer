@@ -4,8 +4,6 @@
 #define endl "\n"
 
 using namespace sf;
-
-
 const int NumElements = 800;
 
 class Visualizer {
@@ -17,18 +15,18 @@ private:
     const Color BackgroundColor = Color::Black;
     const Color DefaultRectangleColor = Color::Cyan;
     const Color CurrentRectangleColor = Color::Red;
-    const std::string TextureFile = "Resources/fondo1.png";
+    const std::string TextureFile = "Resources/sprite.png";
 
     RenderWindow appWindow;
     Event appEvent;
-    Texture fondoTexture;
-    Sprite fondoSprite;
+    Texture imageTexture;
+    Sprite imageSprite;
     RectangleShape rectangle;
     Font font;
     Text timerText;
     Text sortText;
     Text swapText;
-    
+
     bool bl = false;
     int randomh = 0;
     int itera = 0;
@@ -63,16 +61,20 @@ public:
     void bubbleSort();
     void insertionSort();
     void mergeSort();
-    void merge(data array[], int const left, int const mid,
-        int const right);
-    void mergeHelper(data array[], int const begin, int const end);
-    int partition(data array[], int const low, int const high);
-    void quickHelper(data array[], int low, int high);
+    void merge(data[], int const, int const,
+        int const);
+    void mergeHelper(data[], int const, int const);
+    std::pair<int, int> partition(data array[], int const, int const);
+    int quickHelper(data[], int low, int high);
     void quickSort();
+    void heapify(data[], int, int);
+    void heapHelper(data[], int);
+    void heapSort();
+
 };
 
 Visualizer::Visualizer() {
-    
+
     loadResources();
     setupRectangle();
     setupBlanks();
@@ -98,10 +100,10 @@ Visualizer::Visualizer() {
 }
 
 void Visualizer::loadResources() {
-    if (!fondoTexture.loadFromFile(TextureFile)) {
+    if (!imageTexture.loadFromFile(TextureFile)) {
         throw std::runtime_error("Failed to load texture: " + TextureFile);
     }
-    fondoSprite.setTexture(fondoTexture);
+    imageSprite.setTexture(imageTexture);
 }
 
 void Visualizer::setupRectangle() {
@@ -120,7 +122,7 @@ void Visualizer::processEvents() {
 
 void Visualizer::drawRectangles() {
     appWindow.clear(BackgroundColor);
-    appWindow.draw(fondoSprite);
+    appWindow.draw(imageSprite);
     if (!bl) {
         for (int i = 0; i < NumElements; i++) {
             rectangle.setFillColor(DefaultRectangleColor);
@@ -191,11 +193,82 @@ void Visualizer::exitEvent(bool* sortingComplete) {
     }
 }
 
+void Visualizer::heapify(data array[], int n, int i) {
+    int largest = i; // Initialize largest as root Since we are using 0 based indexing
+    int l = 2 * i + 1; // left = 2*i + 1
+    int r = 2 * i + 2; // right = 2*i + 2
+    int swaps = 0;
+
+    // // If left child is larger than root; If right child is larger than largest so far
+    if (l < n && array[l].height > array[largest].height) largest = l;
+    if (r < n && array[r].height > array[largest].height) largest = r;
+
+    // If largest is not root
+    if (largest != i) {
+        std::swap(array[i].height, array[largest].height); swaps++;
+        heapify(array, n, largest);
+    }
+    swapText.setString("Swaps:" + std::to_string(swaps));
+
+    drawRectangles();
+}
+
+void Visualizer::heapHelper(data arr[], int n) {
+    // Build heap (rearrange array)
+    for (int i = n / 2 - 1; i >= 0; i--)
+        heapify(arr, n, i);
+    // One by one extract an element from heap
+    for (int i = n - 1; i >= 0; i--) {
+        // Move current root to end
+        std::swap(arr[0], arr[i]);
+        // call max heapify on the reduced heap
+        heapify(arr, i, 0);
+    }
+}
+void Visualizer::heapSort() {
+    appWindow.create(VideoMode(WindowWidth, WindowHeight), "Sorting Algorithm Visualizer || Heap Sort");
+
+    int cont = 0, sorts = 0;
+    auto startTime = std::chrono::steady_clock::now();
+    bool sortingComplete = false;
+    resetRectangles(); bl = false;
+
+    while (appWindow.isOpen() && !sortingComplete) {
+        processEvents();
+        sortText.setString("Iterations: " + std::to_string(cont + 1));
+        if (part == 2) heapHelper(line, NumElements);
+
+        if (part == 1) {
+            for (int i = 0; i < NumElements; i++) {
+                randomh = 1 + rand() % WindowHeight;
+                line[i].posx = i;
+                line[i].height = randomh;
+                if (i == NumElements - 1) part = 2;
+            }
+        }
+
+        auto currentTime = std::chrono::steady_clock::now();
+        auto elapsedTime = std::chrono::duration_cast<std::chrono::seconds>(currentTime - startTime).count();
+        timerText.setString("Time: " + std::to_string(elapsedTime) + " secs");
+
+        itera++;
+        if (itera >= lims) {
+            itera = 0;
+            cont++;
+            lims--;
+        }
+
+        exitEvent(&sortingComplete);
+    }
+}
+
+
 void Visualizer::mergeHelper(data array[], int const begin, int const end) {
     if (begin >= end)
         return;
 
     int mid = begin + (end - begin) / 2;
+
     mergeHelper(array, begin, mid);
     mergeHelper(array, mid + 1, end);
     merge(array, begin, mid, end);
@@ -290,7 +363,7 @@ void Visualizer::mergeSort() {
         auto currentTime = std::chrono::steady_clock::now();
         auto elapsedTime = std::chrono::duration_cast<std::chrono::seconds>(currentTime - startTime).count();
         timerText.setString("Time: " + std::to_string(elapsedTime) + " secs");
-        
+
         itera++;
         if (itera >= lims) {
             itera = 0;
@@ -302,29 +375,31 @@ void Visualizer::mergeSort() {
     }
 }
 
-int Visualizer::partition(data array[], int const low, int const high) {
+std::pair<int, int> Visualizer::partition(data array[], int const low, int const high) {
     int pivot = array[high].height;
-    int i = low - 1;
+    int i = low - 1, swaps = 0;
 
     for (int j = low; j < high; j++) {
         if (array[j].height < pivot) {
-            i++; std::swap(array[i].height, array[j].height);
+            i++; std::swap(array[i].height, array[j].height); swaps++;
         }
     }
-    std::swap(array[i + 1].height, array[high].height);
-    
+
+    std::swap(array[i + 1].height, array[high].height); swaps++;
     drawRectangles();
 
-    return (i + 1);
+    return { (i + 1), swaps };
 }
 
-void Visualizer::quickHelper(data array[], int low, int high) {
+int Visualizer::quickHelper(data array[], int low, int high) {
     if (low < high) {
-        int pi = partition(array, low, high);
+        std::pair<int, int> pi = partition(array, low, high);
 
-        quickHelper(array, low, pi - 1);
-        quickHelper(array, pi + 1, high);
+        quickHelper(array, low, pi.first - 1);
+        quickHelper(array, pi.first + 1, high);
+        return pi.second;
     }
+    return 0;
 }
 
 void Visualizer::quickSort() {
@@ -338,8 +413,8 @@ void Visualizer::quickSort() {
     while (appWindow.isOpen() && !sortingComplete) {
         processEvents();
 
-        if (part == 2) quickHelper(line, itera, NumElements);
-        
+        if (part == 2) sorts = quickHelper(line, itera, NumElements);
+
         if (part == 1) {
             for (int i = 0; i < NumElements; i++) {
                 randomh = 1 + rand() % WindowHeight;
@@ -348,13 +423,13 @@ void Visualizer::quickSort() {
                 if (i == NumElements - 1) part = 2;
             }
         }
-        
+
         auto currentTime = std::chrono::steady_clock::now();
         auto elapsedTime = std::chrono::duration_cast<std::chrono::seconds>(currentTime - startTime).count();
         timerText.setString("Time: " + std::to_string(elapsedTime) + " secs");
-        sortText.setString("Iterations: " + std::to_string(cont));
-        swapText.setString("Swaps:" + std::to_string(sorts));
-       
+        sortText.setString("Iterations: " + std::to_string(cont + 1));
+        swapText.setString("Swaps:" + std::to_string(sorts + 1));
+
         itera++;
         if (itera >= lims) {
             itera = 0;
@@ -422,7 +497,7 @@ void Visualizer::selectionSort() {
 void Visualizer::insertionSort() {
     appWindow.create(VideoMode(WindowWidth, WindowHeight), "Sorting Algorithm Visualizer || Insertion Sort");
 
-    int cont = 0, sorts=0;
+    int cont = 0, sorts = 0;
     auto startTime = std::chrono::steady_clock::now();
     bool sortingComplete = false;
     resetRectangles(); bl = false;
@@ -464,7 +539,7 @@ void Visualizer::insertionSort() {
             cont++;
             lims--;
         }
-        
+
         exitEvent(&sortingComplete);
     }
 }
@@ -472,7 +547,7 @@ void Visualizer::insertionSort() {
 void Visualizer::bubbleSort() {
     appWindow.create(VideoMode(WindowWidth, WindowHeight), "Sorting Algorithm Visualizer || Bubble Sort");
 
-    int cont = 0, sorts=0;
+    int cont = 0, sorts = 0;
     auto startTime = std::chrono::steady_clock::now();
     bool sortingComplete = false;
     resetRectangles(); bl = false;
@@ -486,7 +561,7 @@ void Visualizer::bubbleSort() {
                 sorts++;
             }
         }
-
+        //Setting values for every rectangles height and x position
         if (part == 1) {
             for (int i = 0; i < NumElements; i++) {
                 randomh = 1 + rand() % WindowHeight;
@@ -496,6 +571,7 @@ void Visualizer::bubbleSort() {
             }
         }
 
+        ///Displaying Info 
         auto currentTime = std::chrono::steady_clock::now();
         auto elapsedTime = std::chrono::duration_cast<std::chrono::seconds>(currentTime - startTime).count();
         timerText.setString("Time: " + std::to_string(elapsedTime) + " secs");
@@ -504,6 +580,7 @@ void Visualizer::bubbleSort() {
 
         drawRectangles();
 
+        //Making sure the algorithm doesnt overrun
         itera++;
         if (itera >= lims) {
             itera = 0;
@@ -528,7 +605,7 @@ void Visualizer::homeScreen() {
     text.setFillColor(Color::Cyan);
     text.setStyle(Text::Bold);
     text.setCharacterSize(20);
-    text.setString("Press 'A' for Bubble Sort\nPress 'B' for Insertion Sort\nPress 'C' for Selection Sort\nPress 'D' for Merge Sort\nPress 'E' for Quick Sort\nPress 'F' for Heap Sort\nPress 'H' for Tim Sort");
+    text.setString("Press 'A' for Bubble Sort\nPress 'B' for Insertion Sort\nPress 'C' for Selection Sort\nPress 'D' for Merge Sort\nPress 'E' for Quick Sort\nPress 'F' for Heap Sort");
     text.setPosition((float)startWindow.getSize().x / 2 - 175.f, (float)startWindow.getSize().y / 2 - 100.f);
 
     while (startWindow.isOpen()) {
@@ -544,17 +621,17 @@ void Visualizer::homeScreen() {
             case Event::TextEntered:
                 if (Event.text.unicode == 65 || Event.text.unicode == 97) {
                     sleep(seconds(2.0f));
-                    bubbleSort();   
+                    bubbleSort();
                 }
                 if (Event.text.unicode == 66 || Event.text.unicode == 98) {
                     sleep(seconds(2.0f));
-                    insertionSort(); 
-                 
+                    insertionSort();
+
                 }
                 if (Event.text.unicode == 67 || Event.text.unicode == 99) {
                     sleep(seconds(2.0f));
                     selectionSort();
-                    
+
                 }
                 if (Event.text.unicode == 68 || Event.text.unicode == 100) {
                     sleep(seconds(2.0f));
@@ -563,6 +640,10 @@ void Visualizer::homeScreen() {
                 if (Event.text.unicode == 69 || Event.text.unicode == 101) {
                     sleep(seconds(2.0f));
                     quickSort();
+                }
+                if (Event.text.unicode == 70 || Event.text.unicode == 102) {
+                    sleep(seconds(2.0f));
+                    heapSort();
                 }
                 break;
 
